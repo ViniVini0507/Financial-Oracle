@@ -72,7 +72,7 @@ with st.sidebar:
     db_trv = st.text_input("Viagens ID", value=st.secrets.get("NOTION_DB_TRAVEL", ""))
 
     st.divider()
-    splitwise_receivable = st.number_input("Splitwise a Receber (€)", value=145.42, step=10.0)
+    splitwise_receivable = st.number_input("Splitwise a Receber (€)", value=109.18, step=10.0)
     horizon = st.slider("Horizonte de Previsão", 15, 90, 30)
     if st.button("🔄 Limpar Cache"):
         st.cache_data.clear()
