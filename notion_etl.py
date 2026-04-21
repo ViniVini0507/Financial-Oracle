@@ -139,8 +139,11 @@ def load_travel(client: NotionClient, db_id: str) -> pd.DataFrame:
             "trip_name": _prop(p, "Nome da Viagem"),
             "budget_ceiling": _fuzzy_num(p, ["teto", "orçament"]),
             "actual_spent": _fuzzy_num(p, ["gasto", "real"]),
+            "start_date": _prop(p, "Date")  # Captura o início da viagem
         })
     df = pd.DataFrame(records)
+    if not df.empty:
+        df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
     return df.dropna(subset=["trip_name"]).sort_values("actual_spent", ascending=False).reset_index(drop=True)
 
 def load_all(token: str, db_transactions: str, db_accounts: str, db_budgets: str, db_travel: str) -> dict:
