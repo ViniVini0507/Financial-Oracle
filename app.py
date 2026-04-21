@@ -138,7 +138,9 @@ with tab_oracle:
     with cfo_col2:
         manual_burn = st.slider("Ajustar Gasto Diário (€)", -100.0, 0.0, -15.0, 1.0) if cfo_override else None
 
-    result = forecast_balance(df_tx_geral, caixa_sobrevivencia, horizon, burn_override=manual_burn, extra_expenses=st.session_state.extra_expenses)
+    # Filtra os gastos simulados para abater apenas do caixa correto
+    sim_sobrevivencia = [e for e in st.session_state.extra_expenses if e.get("conta", "Sobrevivência") == "Sobrevivência"]
+    result = forecast_balance(df_tx_geral, caixa_sobrevivencia, horizon, burn_override=manual_burn, extra_expenses=sim_sobrevivencia)
 
     # KPIs Rápidos
     k1, k2, k3 = st.columns(3)
@@ -150,17 +152,18 @@ with tab_oracle:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=result.historical["date"], y=result.historical["balance"], name="Histórico", line=dict(color="#f5a623", width=3)))
     fig.add_trace(go.Scatter(x=result.projection["date"], y=result.projection["balance"], name="Projeção", line=dict(color="#ef4444" if cfo_override else "#3ecfcf", dash="dot", width=3)))
-    fig.update_layout(**PLOTLY_LAYOUT, height=400, hovermode="x unified")
+    fig.update_layout(**PLOTLY_LAYOUT, height=450, hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
     with st.expander("➕ Simular Gasto Extra (Não recorrente)"):
         with st.form("sim_form", clear_on_submit=True):
-            f1, f2, f3, f4 = st.columns([3,2,2,1])
+            f1, f2, f3, f4, f5 = st.columns([2, 2, 2, 2, 1])
             desc = f1.text_input("O que é?")
-            dt = f2.date_input("Quando?")
-            val = f3.number_input("Quanto (€)?", min_value=1.0, value=50.0)
-            if f4.form_submit_button("Adicionar"):
-                st.session_state.extra_expenses.append({"date": dt.isoformat(), "amount": -val, "label": desc})
+            conta_sim = f2.selectbox("De qual Caixa?", ["Sobrevivência", "Viagens", "Eurotrip"])
+            dt = f3.date_input("Quando?")
+            val = f4.number_input("Quanto (€)?", min_value=1.0, value=50.0)
+            if f5.form_submit_button("Adicionar"):
+                st.session_state.extra_expenses.append({"date": dt.isoformat(), "amount": -val, "label": desc, "conta": conta_sim})
                 st.rerun()
 
 # --- TAB 2: CATEGORIAS ---
@@ -180,28 +183,32 @@ with tab_budget:
 
 # --- TAB 3: VIAGENS ---
 with tab_travel:
-    st.subheader("Status das Viagens (Exclui Eurotrip)")
-    df_tg = df_trv[~df_trv["trip_name"].str.contains("Eurotrip", case=False)]
-    if not df_tg.empty:
+    st.subheader("Custo de Todas as Viagens")
+    if not df_trv.empty:
+        travel_palette = ["#3ecfcf", "#f5a623", "#a855f7", "#ec4899", "#22c55e", "#3b82f6"]
+        color_array = [travel_palette[i % len(travel_palette)] for i in range(len(df_trv))]
+
         fig_t = go.Figure()
-        fig_t.add_trace(go.Bar(y=df_tg["trip_name"], x=df_tg["budget_ceiling"], orientation="h", name="Teto", marker_color="rgba(55,65,81,0.5)"))
-        fig_t.add_trace(go.Bar(y=df_tg["trip_name"], x=df_tg["actual_spent"], orientation="h", name="Gasto", marker_color="#3ecfcf", text=[EUR(a) for a in df_tg["actual_spent"]], textposition="outside"))
-        fig_t.update_layout(**PLOTLY_LAYOUT, barmode="overlay", yaxis=dict(autorange="reversed"), height=350)
+        fig_t.add_trace(go.Bar(y=df_trv["trip_name"], x=df_trv["budget_ceiling"], orientation="h", name="Teto", marker_color="rgba(55,65,81,0.5)"))
+        fig_t.add_trace(go.Bar(y=df_trv["trip_name"], x=df_trv["actual_spent"], orientation="h", name="Gasto", marker_color=color_array, text=[EUR(a) for a in df_trv["actual_spent"]], textposition="outside", textfont=dict(size=15)))
+        fig_t.update_layout(**PLOTLY_LAYOUT, barmode="overlay", yaxis=dict(autorange="reversed"), height=max(350, len(df_trv)*70))
         st.plotly_chart(fig_t, use_container_width=True)
 
 # --- TAB 4: EUROTRIP ---
 with tab_eurotrip:
-    st.markdown("### 🌍 Dashboard Eurotrip")
-    df_te = df_trv[df_trv["trip_name"].str.contains("Eurotrip", case=False)]
-    if not df_te.empty:
-        tr = df_te.iloc[0]
-        c1, c2, c3 = st.columns(3)
-        c1.metric("Teto Total", EUR(tr["budget_ceiling"]))
-        c2.metric("Consumido", EUR(tr["actual_spent"]))
-        c3.metric("Disponível", EUR(tr["budget_ceiling"] - tr["actual_spent"]))
+    st.markdown("### 🌍 Dashboard Financeiro: Eurotrip")
 
-        st.markdown("**Saldos em Moeda (Contas Eurotrip)**")
-        st.dataframe(df_acc_eurotrip[["account", "balance", "currency"]], hide_index=True, use_container_width=True)
+    saldo_eurotrip = df_acc_eurotrip["balance"].sum()
+    sim_eurotrip = [e for e in st.session_state.extra_expenses if e.get("conta") == "Eurotrip"]
+    impacto_simulado = sum(e["amount"] for e in sim_eurotrip) # amount já entra negativo
+
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Saldo Atual em Conta", EUR(saldo_eurotrip))
+    c2.metric("Gasto Simulado (Pendente)", EUR(abs(impacto_simulado)))
+    c3.metric("Saldo Pós-Simulação", EUR(saldo_eurotrip + impacto_simulado))
+
+    st.markdown("**Saldos em Moeda (Contas Eurotrip)**")
+    st.dataframe(df_acc_eurotrip[["account", "balance", "currency"]], hide_index=True, use_container_width=True)
 
 # --- TAB 5: CONTAS ---
 with tab_accounts:
@@ -213,7 +220,7 @@ with tab_accounts:
 
 # --- TAB 6: BASE ---
 with tab_db:
-    st.subheader("Histórico de Transações (Recentes primeiro)")
+    st.subheader("Histórico de Transações")
     st.dataframe(
         df_tx[["date", "description", "amount", "type", "context"]].sort_values("date", ascending=False),
         hide_index=True, use_container_width=True, height=600
