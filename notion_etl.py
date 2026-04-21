@@ -135,15 +135,24 @@ def load_travel(client: NotionClient, db_id: str) -> pd.DataFrame:
     records = []
     for page in pages:
         p = page.get("properties", {})
+        
+        # Caçador de datas: varre todas as colunas e pega a primeira que for do tipo "date"
+        dt_val = None
+        for k, v in p.items():
+            if v and isinstance(v, dict) and v.get("type") == "date" and v.get("date"):
+                dt_val = v["date"].get("start")
+                break
+                
         records.append({
             "trip_name": _prop(p, "Nome da Viagem"),
             "budget_ceiling": _fuzzy_num(p, ["teto", "orçament"]),
             "actual_spent": _fuzzy_num(p, ["gasto", "real"]),
-            "start_date": _prop(p, "Date")  # Captura o início da viagem
+            "start_date": dt_val
         })
     df = pd.DataFrame(records)
     if not df.empty:
-        df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce")
+        # Força o formato de data e arranca o fuso horário para o Plotly não bugar
+        df["start_date"] = pd.to_datetime(df["start_date"], errors="coerce").dt.tz_localize(None)
     return df.dropna(subset=["trip_name"]).sort_values("actual_spent", ascending=False).reset_index(drop=True)
 
 def load_all(token: str, db_transactions: str, db_accounts: str, db_budgets: str, db_travel: str) -> dict:
