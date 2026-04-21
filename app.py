@@ -149,7 +149,7 @@ with tab_oracle:
     k3.metric("Fôlego de Caixa", f"{int(result.days_until_zero)} dias" if result.days_until_zero else "Seguro ✓")
 
     # Gráfico Oracle
-  fig = go.Figure()
+    fig = go.Figure()
     fig.add_trace(go.Scatter(x=result.historical["date"], y=result.historical["balance"], name="Histórico", line=dict(color="#f5a623", width=3)))
     fig.add_trace(go.Scatter(x=result.projection["date"], y=result.projection["balance"], name="Projeção", line=dict(color="#ef4444" if cfo_override else "#3ecfcf", dash="dot", width=3)))
     
