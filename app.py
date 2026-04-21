@@ -152,6 +152,16 @@ with tab_oracle:
     fig = go.Figure()
     fig.add_trace(go.Scatter(x=result.historical["date"], y=result.historical["balance"], name="Histórico", line=dict(color="#f5a623", width=3)))
     fig.add_trace(go.Scatter(x=result.projection["date"], y=result.projection["balance"], name="Projeção", line=dict(color="#ef4444" if cfo_override else "#3ecfcf", dash="dot", width=3)))
+    
+    # Injetando as linhas pontilhadas de cada viagem
+    if not df_trv.empty and "start_date" in df_trv.columns:
+        for _, row in df_trv.dropna(subset=["start_date"]).iterrows():
+            fig.add_vline(
+                x=row["start_date"], line_width=1.5, line_dash="dot", line_color="rgba(255,255,255,0.4)",
+                annotation_text=row["trip_name"], annotation_position="top left", 
+                annotation_font=dict(size=11, color="rgba(255,255,255,0.6)")
+            )
+
     fig.update_layout(**PLOTLY_LAYOUT, height=450, hovermode="x unified")
     st.plotly_chart(fig, use_container_width=True)
 
