@@ -153,13 +153,18 @@ with tab_oracle:
     fig.add_trace(go.Scatter(x=result.historical["date"], y=result.historical["balance"], name="Histórico", line=dict(color="#f5a623", width=3)))
     fig.add_trace(go.Scatter(x=result.projection["date"], y=result.projection["balance"], name="Projeção", line=dict(color="#ef4444" if cfo_override else "#3ecfcf", dash="dot", width=3)))
     
-    # Injetando as linhas pontilhadas de cada viagem
+    # Injetando as linhas pontilhadas (agora à prova de falhas)
     if not df_trv.empty and "start_date" in df_trv.columns:
-        for _, row in df_trv.dropna(subset=["start_date"]).iterrows():
+        df_plot_trv = df_trv.dropna(subset=["start_date"])
+        for _, row in df_plot_trv.iterrows():
             fig.add_vline(
-                x=row["start_date"], line_width=1.5, line_dash="dot", line_color="rgba(255,255,255,0.4)",
-                annotation_text=row["trip_name"], annotation_position="top left", 
-                annotation_font=dict(size=11, color="rgba(255,255,255,0.6)")
+                x=row["start_date"], 
+                line_width=2, 
+                line_dash="dash", 
+                line_color="#ec4899", # Rosa choque para destaque
+                annotation_text=row["trip_name"], 
+                annotation_position="top left", 
+                annotation_font=dict(size=13, color="#ec4899", weight="bold")
             )
 
     fig.update_layout(**PLOTLY_LAYOUT, height=450, hovermode="x unified")
