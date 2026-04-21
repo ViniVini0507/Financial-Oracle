@@ -73,7 +73,7 @@ with st.sidebar:
 
     st.divider()
     splitwise_receivable = st.number_input("Splitwise a Receber (€)", value=109.18, step=10.0)
-    horizon = st.slider("Horizonte de Previsão", 15, 90, 30)
+    horizon = st.slider("Horizonte de Previsão", 15, 45, 16)
     if st.button("🔄 Limpar Cache"):
         st.cache_data.clear()
         st.rerun()
@@ -149,21 +149,38 @@ with tab_oracle:
     k3.metric("Fôlego de Caixa", f"{int(result.days_until_zero)} dias" if result.days_until_zero else "Seguro ✓")
 
     # Gráfico Oracle
-   # Injetando as linhas pontilhadas (agora à prova de bugs matemáticos do Plotly)
+  fig = go.Figure()
+    fig.add_trace(go.Scatter(x=result.historical["date"], y=result.historical["balance"], name="Histórico", line=dict(color="#f5a623", width=3)))
+    fig.add_trace(go.Scatter(x=result.projection["date"], y=result.projection["balance"], name="Projeção", line=dict(color="#ef4444" if cfo_override else "#3ecfcf", dash="dot", width=3)))
+    
+    # Injetando as linhas de viagens (Bypass do bug nativo do Plotly)
     if not df_trv.empty and "start_date" in df_trv.columns:
         df_plot_trv = df_trv.dropna(subset=["start_date"])
         for _, row in df_plot_trv.iterrows():
-            # Transforma a data em texto puro (YYYY-MM-DD) para evitar o erro do Plotly
-            dt_string = row["start_date"].strftime("%Y-%m-%d")
+            # Extrai apenas o pedaço YYYY-MM-DD da data
+            d_str = str(row["start_date"])[:10]
             
-            fig.add_vline(
-                x=dt_string, 
-                line_width=2, 
-                line_dash="dash", 
-                line_color="#ec4899",
-                annotation_text=row["trip_name"], 
-                annotation_position="top left", 
-                annotation_font=dict(size=13, color="#ec4899")
+            # 1. Desenha a linha vertical isolada
+            fig.add_shape(
+                type="line",
+                x0=d_str, x1=d_str,
+                y0=0, y1=1,
+                yref="paper", # Faz a linha ir do topo à base do gráfico
+                line=dict(color="#ec4899", width=2, dash="dash")
+            )
+            
+            # 2. Cola o texto isolado (sem o Plotly tentar fazer contas)
+            fig.add_annotation(
+                x=d_str,
+                y=0.95, # Posição bem no alto do gráfico
+                yref="paper",
+                text=row["trip_name"],
+                showarrow=False,
+                font=dict(size=12, color="#ec4899"),
+                xanchor="left",
+                yanchor="bottom",
+                textangle=-90, # Deixa o texto deitado acompanhando a linha (opcional)
+                xshift=5 # Dá um espacinho da linha para não colar
             )
 
     fig.update_layout(**PLOTLY_LAYOUT, height=450, hovermode="x unified")
